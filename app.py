@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from langchain_community.chat_models import ChatZhipuAI
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 import os
@@ -17,7 +17,7 @@ if api_key is None:
     raise ValueError("API key not found. Please set the ZHIPUAI_API_KEY environment variable.")
 
 chat = ChatZhipuAI(
-    model="glm-4",
+    model="glm-4v-flash",
     temperature=0.5,
 )
 
@@ -62,6 +62,9 @@ def chat_api():
         print(f"Error processing request: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
+@app.route('/chat')
+def chat_interface():
+    return send_file('chat.html')  # Return the new chat.html file
 
 if __name__ == '__main__':
     app.run(debug=True)
