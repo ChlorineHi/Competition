@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI 聊天</title>
+    <meta charset="UTF-8">
+    <style>
+        /* 流畅的排版 */
+        body {
+            font-family: 'Arial', sans-serif; /* 使用无衬线字体 */
+            font-size: 16px; /* 字体大小调整为 16px */
+            line-height: 1.6; /* 增加行高 */
+            color: rgb(0, 0, 0); /* 黑色文字 */
+            transition: background 1s ease, color 1s ease; /* 平滑过渡背景颜色和文字颜色 */
+        }
+        body.night-mode {
+            background: linear-gradient(to bottom, #2c3e50, #34495e); /* 夜间背景 */
+            color: #fff; /* 夜间文字颜色 */
+        }
+        #chatArea {
+            max-height: 500px; /* 最大高度 */
+            min-height: 200px; /* 最小高度 */
+            resize: vertical;  /* 允许垂直调整大小 */
+            overflow-y: auto;  /* 允许垂直滚动 */
+            transition: height 0.4s cubic-bezier(0.42, 0, 0.58, 1); /* 更平滑的动画 */
+            border: 1px solid #ccc;  /* 边框 */
+            position: relative; /* 保证底部区域可以覆盖 */
+            padding: 10px;
+            background-color: rgba(255, 255, 255, 0.1); /* 半透明白色背景 */
+            transition: height 0.3s ease; /* 添加平滑过渡效果 */
+        }
+        .bubble {
+            margin: 15px 0; /* 增加对话框之间的间距 */
+            padding: 15px 20px; /* 增加对话框内边距 */
+            border-radius: 10px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            background-color: rgba(255, 255, 255, 0.2); /* 消息气泡背景 */
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            opacity: 0;
+            transform: translateY(10px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* 添加阴影效果 */
+        }
+        .bubble.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .bubble.user {
+            background-color: #f7f7f7; /* 用户消息气泡 */
+        }
+        .bubble.ai {
+            background-color: #e5e5e5; /* AI消息气泡 */
+        }
+        body.night-mode .bubble {
+            background-color: #000;
+            color: #fff;
+        }
+        .message {
+            font-size: 16px; /* 适中的文本大小 */
+        }
+        button {
+            position: relative;
+            z-index: 10; /* 确保按钮在最上层 */
+            border-radius: 25px; /* 圆角设计 */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* 轻微阴影效果 */
+            transition: background 0.3s ease, transform 0.3s ease; /* 平滑过渡 */
+            background: linear-gradient(45deg, #4CAF50, #81C784); /* 渐变绿色按钮 */
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin-top: 16px; /* 按钮与输入框之间的间距 */
+            transition: transform 0.2s ease; /* 按钮缩放效果 */
+        }
+        button:hover {
+            background: linear-gradient(45deg, #81C784, #4CAF50); /* 按钮悬停效果 */
+            transform: scale(1.05); /* 按钮放大效果 */
+        }
+        button:disabled {
+            background: #e0e0e0;
+            color: #bdbdbd;
+            cursor: not-allowed;
+            transform: scale(1);
+        }
+        button:active {
+            transform: scale(0.98);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: #fff;
+            margin-right: 10px;
+            transition: transform 0.2s ease; /* 头像缩放效果 */
+        }
+        .avatar:hover {
+            transform: scale(1.1); /* 悬停时放大效果 */
+        }
+        .chat-container {
+            background-color: rgba(255, 255, 255, 0.1); /* 浅色背景 */
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 16px; /* 模块之间的间距 */
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out; /* 0.5秒的渐显动画 */
+        }
+        .notification {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        }
+        .loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 20px;
+        }
+        @keyframes loadingAnimation {
+            0% { opacity: 0; }
+            50% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        @keyframes backgroundAnimation {
+            0% { background: linear-gradient(to right, rgba(135, 206, 250, 0.8), rgba(255, 255, 255, 0.8)); }
+            50% { background: linear-gradient(to right, rgba(106, 90, 205, 0.8), rgba(72, 61, 139, 0.8)); }
+            100% { background: linear-gradient(to right, rgba(135, 206, 250, 0.8), rgba(255, 255, 255, 0.8)); }
+        }
+        @keyframes waveAnimation {
+            0% { transform: scale(1) translateY(0); }
+            50% { transform: scale(1.01) translateY(-2px); }
+            100% { transform: scale(1) translateY(0); }
+        }
+        .wave-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, #4facfe, #00f2fe);
+            animation: gradientWave 5s ease-in-out infinite;
+            opacity: 0.1;
+        }
+        @keyframes gradientWave {
+            0% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+        .math-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            opacity: 0.1;
+            background: url('math-pattern.png') repeat;
+        }
+
+        /* 夜间模式 */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: linear-gradient(to right, rgb(18, 18, 18), rgb(30, 30, 30)); /* 深色背景 */
+                color: rgb(255, 255, 255); /* 白色文字 */
+            }
+        }
+        #questionInput {
+            padding: 12px;
+            font-size: 16px;
+            font-family: 'Arial', sans-serif;
+            width: 100%;
+            max-width: 400px;
+            box-sizing: border-box;
+        }
+
+        #questionInput::placeholder {
+            color: #aaa;
+            font-style: italic;
+        }
+
+        #questionInput:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
+        }
+        #questionInput {
+            position: relative;
+            z-index: 10; /* 确保输入框在最上层 */
+        }
+
+        @keyframes dayBackground {
+            0% { background: linear-gradient(45deg, #9ecaff, #4f79e4); }
+            100% { background: linear-gradient(45deg, #4f79e4, #9ecaff); }
+        }
+        @keyframes nightBackground {
+            0% { background: linear-gradient(45deg, #2a2a2a, #1f1f1f); }
+            100% { background: linear-gradient(45deg, #1f1f1f, #2a2a2a); }
+        }
+
+        @keyframes waveEffect {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            50% { transform: translateY(-5px) scale(1.02); opacity: 0.8; }
+            100% { transform: translateY(0) scale(1); opacity: 1; }
+        }
+
+        .wave-background {
+            animation: waveEffect 10s ease-in-out infinite; /* 调整波动动画的速度和频率 */
+        }
+        
+        .chat-input-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        #questionInput {
+            margin-right: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .chat-input-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+        
+        button.loading {
+            background: #8bc34a;
+            content: '发送中...';
+        }
+        
+        @media (max-width: 600px) {
+            #chatArea {
+                max-height: 300px; /* 在小屏幕设备上减小 chatArea 的最大高度 */
+            }
+        }
+        #resizeHandle {
+            background: linear-gradient(45deg, #888, #ccc);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            cursor: ns-resize; 
+            height: 10px; 
+            width: 100%; 
+        }
+        /* 页面容器 */
+        #container {
+          display: flex;   /* 使用flex布局，保证元素水平排列 */
+          height: 100vh;   /* 满屏高度 */
+        }
+
+        /* 左侧导航栏 */
+        #sidebar {
+          width: 250px;    /* 左侧导航栏固定宽度 */
+          height: 100%;    /* 充满屏幕高度 */
+          background-color: #2c3e50;
+          color: white;
+          padding: 20px;
+          box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+          position: fixed; /* 固定在左侧 */
+        }
+
+        #sidebar h2 {
+          font-size: 20px;
+          margin-bottom: 30px;
+          text-align: center;
+        }
+
+        button {
+          width: 100%;
+          padding: 12px;
+          margin-bottom: 10px;
+          border: none;
+          border-radius: 5px;
+          color: white;
+          font-size: 16px;
+          cursor: pointer;
+          transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+          opacity: 0.8;
+        }
+
+        /* 聊天区域 */
+        #chatArea {
+          flex-grow: 1;      /* chatArea区域占用剩余空间 */
+          margin-left: 250px; /* 留出左侧导航栏空间 */
+          padding: 20px;
+          background-color: #f5f5f5;  /* 背景颜色 */
+          position: relative; /* 为按钮定位提供参考 */
+        }
+
+        /* 小屏幕适配 */
+        @media (max-width: 768px) {
+          #container {
+            flex-direction: column; /* 小屏幕时使用纵向布局 */
+          }
+
+          #sidebar {
+            width: 100%;  /* 在小屏幕下，导航栏充满屏幕宽度 */
+            position: relative; /* 不固定，随内容流动 */
+          }
+
+          #chatArea {
+            margin-left: 0;  /* 移除左侧间距 */
+          }
+        }
+        #inputArea {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background-color: #fff;
+            box-shadow: 0px 2px 10px rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            z-index: 10;
+        }
+        #questionInput {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-right: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #3498db;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        
+        /* 用户对话框样式 */
+        .user-message {
+            background-color: #f0f0f0; /* 浅灰色 */
+            color: #333; /* 深灰色 */
+            padding: 10px;
+            border-radius: 5px;
+            margin: 5px 0;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5); /* 添加阴影效果 */
+        }
+        .user-message:hover {
+            background-color: #d0e7ff; /* 悬停时改变背景颜色 */
+            color: #0a3d9a; /* 悬停时改变文字颜色 */
+        }
+
+        /* AI 对话框样式 */
+        .ai-message {
+            background-color: #e5e5e5; /* 浅灰色 */
+            color: #666; /* 深灰色 */
+            padding: 10px;
+            border-radius: 5px;
+            margin: 5px 0;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5); /* 添加阴影效果 */
+        }
+        .ai-message:hover {
+            background-color: #d0f0c0; /* 悬停时改变背景颜色 */
+            color: #1a4d1a; /* 悬停时改变文字颜色 */
+        }
+        /* 高对比模式支持 */
+        body.high-contrast {
+            background-color: #000; /* 深色背景 */
+            color: #fff; /* 浅色字体 */
+        }
+        body.high-contrast .bubble {
+            background-color: #000; /* 深色背景 */
+            color: #fff; /* 浅色字体 */
+        }
+        body {
+            background: linear-gradient(to right, rgb(18, 18, 18), rgb(30, 30, 30)); /* 深色背景 */
+            color: rgb(0, 0, 0); /* 黑色文字 */
+        }
+    </style>
+</head>
+<body>
+    <div class="math-background"></div>
+    <div class="wave-background"></div>
+    <div id="container">
+        <div id="sidebar">
+            <h2>对话管理</h2>
+            <button id="newChatButton">新对话</button>
+            <button id="historyButton">历史记录</button>
+        </div>
+        <div id="chatArea">
+            <!-- 聊天内容区域 -->
+            <button id="toggleButton" onclick="toggleChatArea()" style="font-size: 10px; padding: 5px 5px; width: 60px;">折叠</button>
+        </div>
+    </div>
+    <div id="inputArea">
+        <input id="questionInput" type="text" placeholder="请输入问题">
+        <button onclick="sendQuestion()">发送</button>
+    </div>
+    <div id="resizeHandle"></div>
+
+    <script>
+    function generateAvatar(type) {
+        const avatar = document.createElement('div');
+        avatar.className = 'fade-in avatar';
+        avatar.style.width = '40px';
+        avatar.style.height = '40px';
+        avatar.style.borderRadius = '50%';
+        avatar.style.display = 'flex';
+        avatar.style.alignItems = 'center';
+        avatar.style.justifyContent = 'center';
+        avatar.style.fontSize = '20px';
+        avatar.style.color = '#fff';
+        
+        // Generate random colors for the avatars
+        const randomColor = '#' + Math.floor(Math.random()*16777215).toString(16);
+        avatar.style.backgroundColor = randomColor;
+        avatar.innerText = type === 'user' ? 'U' : 'A';
+        return avatar;
+    }
+
+    // Function to initialize default avatars
+    function initializeDefaultAvatars() {
+        const chatArea = document.getElementById('chatArea');
+        const userAvatar = generateAvatar('user');
+        const aiAvatar = generateAvatar('ai');
+
+        // Create a bubble for the default user message
+        const userBubble = document.createElement('div');
+        userBubble.className = 'bubble user show';
+        userBubble.appendChild(userAvatar);
+        userBubble.appendChild(document.createTextNode('欢迎来到聊天！')); // Default message
+        chatArea.appendChild(userBubble);
+
+        // Create a bubble for the default AI message
+        const aiBubble = document.createElement('div');
+        aiBubble.className = 'bubble ai show';
+        aiBubble.appendChild(aiAvatar);
+        aiBubble.appendChild(document.createTextNode('你好！有什么我可以帮助你的吗？')); // Default AI message
+        chatArea.appendChild(aiBubble);
+    }
+
+    // 函数用于显示通知
+    function showNotification(title, message) {
+        // 检查浏览器是否支持通知
+        if (!('Notification' in window)) {
+            alert('此浏览器不支持桌面通知。');
+            return;
+        }
+
+        // 请求通知权限
+        if (Notification.permission === 'granted') {
+            // 创建并显示通知
+            new Notification(title, { body: message });
+        } else if (Notification.permission !== 'denied') {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    new Notification(title, { body: message });
+                }
+            });
+        }
+    }
+
+    // 显示加载动画
+    function showLoading() {
+        const loading = document.createElement('div');
+        loading.className = 'loading';
+        loading.innerText = '加载中...';
+        document.body.appendChild(loading);
+        loading.style.display = 'block';
+        loading.style.animation = 'loadingAnimation 1s infinite';
+    }
+
+    // 隐藏加载动画
+    function hideLoading() {
+        const loading = document.querySelector('.loading');
+        if (loading) {
+            loading.remove();
+        }
+    }
+
+    function sendQuestion() {
+        showLoading(); // 显示加载动画
+        const question = document.getElementById('questionInput').value;
+        const chatArea = document.getElementById('chatArea');
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble user';
+        const avatar = generateAvatar('user');
+        const message = document.createElement('span');
+        message.innerHTML = `你: ${question}`;
+        message.className = 'message user-message';
+        bubble.appendChild(avatar);
+        bubble.appendChild(message);
+        chatArea.appendChild(bubble);
+        bubble.classList.add('show'); // 添加动画效果
+        chatArea.scrollTop = chatArea.scrollHeight;
+        document.getElementById('questionInput').value = '';
+        document.getElementById('questionInput').focus(); // 确保输入框获得焦点
+
+        fetch('/index', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question: question })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok: ' + response.statusText);
+            }
+            return response.json();
+        })
+        .then(data => {
+            const responseText = data.response || '未知错误';
+            const responseBubble = document.createElement('div');
+            responseBubble.className = 'bubble ai';
+            const responseAvatar = generateAvatar('ai');
+            const responseMessage = document.createElement('span');
+            responseMessage.innerHTML = `AI: ${responseText}`;
+            responseMessage.className = 'message ai-message';
+            responseBubble.appendChild(responseAvatar);
+            responseBubble.appendChild(responseMessage);
+            chatArea.appendChild(responseBubble);
+            responseBubble.classList.add('show'); // 添加动画效果
+            chatArea.scrollTop = chatArea.scrollHeight;
+            showNotification('新消息', 'AI 回复: ' + responseText);
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
+            const errorBubble = document.createElement('div');
+            errorBubble.className = 'bubble ai';
+            const errorAvatar = generateAvatar('ai');
+            const errorMessage = document.createElement('span');
+            errorMessage.innerHTML = 'AI: 请求发生错误';
+            errorMessage.className = 'message ai-message';
+            errorBubble.appendChild(errorAvatar);
+            errorBubble.appendChild(errorMessage);
+            chatArea.appendChild(errorBubble);
+            errorBubble.classList.add('show'); // 添加动画效果
+            chatArea.scrollTop = chatArea.scrollHeight;
+            showNotification('错误', '系统错误，请稍后再试。');
+        })
+        .finally(() => {
+            hideLoading(); // 隐藏加载动画
+        });
+    }
+
+    // Initialize default avatars when the page loads
+    initializeDefaultAvatars();
+
+    // 动态更新背景颜色
+    function setDayBackground() {
+        document.body.style.background = 'linear-gradient(to bottom, #ffffff, #f0f8ff)'; // 白天背景
+        document.body.style.color = '#333'; // 白天文字颜色
+    }
+
+    function setNightBackground() {
+        document.body.style.background = 'linear-gradient(to bottom, #2c3e50, #34495e)'; // 夜晚背景
+        document.body.style.color = '#fff'; // 夜晚文字颜色
+    }
+
+    function updateBackgroundColor() {
+        const now = new Date();
+        const hours = now.getHours();
+
+        if (hours >= 6 && hours < 18) {
+            setDayBackground();
+        } else {
+            setNightBackground();
+        }
+    }
+
+    // 页面加载时更新背景颜色
+    updateBackgroundColor();
+    // 每小时更新一次背景颜色
+    setInterval(updateBackgroundColor, 3600000);
+
+    let isResizing = false;
+    let lastClientY = 0;
+    const resizeHandle = document.getElementById('resizeHandle');
+    const chatArea = document.getElementById('chatArea');
+    const minHeight = 200;  // 最小高度
+    const maxHeight = 500;  // 最大高度
+
+    resizeHandle.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      document.body.style.userSelect = 'none'; // 禁止文本选择，避免干扰
+
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', () => {
+        isResizing = false;
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.body.style.userSelect = '';  // 解除禁止文本选择
+      });
+    });
+
+    function handleMouseMove(e) {
+      if (isResizing) {
+        const newHeight = e.clientY - chatArea.offsetTop;
+        if (newHeight > minHeight && newHeight < maxHeight) {
+          chatArea.style.height = `${newHeight}px`;
+        }
+      }
+    }
+
+    function toggleChatArea() {
+        const chatArea = document.getElementById('chatArea');
+        if (chatArea.style.height === '200px') {
+            chatArea.style.height = '500px';  // 展开
+        } else {
+            chatArea.style.height = '200px';  // 折叠
+        }
+    }
+    </script>
+</body>
+</html>
